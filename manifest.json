@@ -1,6 +1,6 @@
 {
-  "name": "Курьер Экспресс",
-  "short_name": "Курьер",
+  "name": "Water",
+  "short_name": "Water",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f4f5f9",
