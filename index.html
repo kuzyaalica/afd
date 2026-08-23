@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Курьер Экспресс</title>
+  
+  <!-- Подключение PWA манифеста -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0061a4">
+
+  <!-- Скрипт регистрации автообновлений и офлайн-режима -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').then(reg => {
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                window.location.reload();
+              }
+            });
+          });
+        });
+      });
+    }
+  </script>
+  
+  <!-- Firebase SDK (v9+ compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+  <!-- SortableJS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+
+  <!-- QRCode.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <style>
+    :root {
+      --bg-color: #f4f5f9;
+      --card-bg: #ffffff;
+      --text-color: #1c1b1f;
+      --text-sub: #606060;
+      --primary: #0061a4;
+      --primary-container: #d1e4ff;
+      --on-primary: #ffffff;
+      --border-color: #e0e2ec;
+      --shadow: 0 2px 8px rgba(0,0,0,0.08);
+      --card-radius: 16px;
+    }
+
+    body.dark-mode {
+      --bg-color: #121316;
+      --card-bg: #1e1f23;
+      --text-color: #e2e2e6;
+      --text-sub: #8e9099;
+      --primary: #a8c7ff;
+      --primary-container: #004778;
+      --on-primary: #003052;
+      --border-color: #2e3036;
+      --shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      padding-bottom: 80px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    /* Шапка */
+    header {
+      position: sticky;
+      top: 0;
+      background-color: var(--card-bg);
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: var(--shadow);
+      z-index: 100;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .courier-select-wrapper {
+      position: relative;
+    }
+
+    .courier-btn {
+      background: var(--primary-container);
+      color: var(--text-color);
+      border: none;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      background: none;
+      border: none;
+      font-size: 20px;
+      color: var(--text-color);
+      padding: 8px;
+      cursor: pointer;
+      border-radius: 50%;
+    }
+
+    /* Выпадающее меню курьеров */
+    .dropdown-menu {
+      position: absolute;
+      top: 110%;
+      left: 0;
+      background: var(--card-bg);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border-color);
+      width: 200px;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 101;
+    }
+
+    .dropdown-menu.show {
+      display: flex;
+    }
+
+    .dropdown-item {
+      padding: 12px 16px;
+      background: none;
+      border: none;
+      text-align: left;
+      color: var(--text-color);
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    .dropdown-item:hover, .dropdown-item.active {
+      background: var(--primary-container);
+    }
+
+    /* Список заказов */
+    #ordersContainer {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* Плитка */
+    .order-card {
+      background: var(--card-bg);
+      border-radius: var(--card-radius);
+      padding: 16px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border-color);
+      position: relative;
+      user-select: none;
+      touch-action: manipulation;
+    }
+
+    .order-card.compact {
+      padding: 10px 14px;
+      border-radius: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .order-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .order-address {
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--text-color);
+    }
+
+    .compact .order-address {
+      font-size: 14px;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-right: 10px;
+    }
+
+    .order-qty {
+      font-size: 13px;
+      background: var(--primary-container);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .order-desc {
+      font-size: 14px;
+      color: var(--text-sub);
+      margin-bottom: 12px;
+    }
+
+    .order-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .order-tags {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .tag-badge {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .order-price {
+      font-weight: 700;
+      font-size: 17px;
+      color: var(--primary);
+    }
+
+    /* FAB */
+    .fab {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--primary);
+      color: var(--on-primary);
+      border: none;
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      font-size: 28px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 90;
+    }
+
+    /* Модалки */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 200;
+      padding: 16px;
+    }
+
+    .modal.show { display: flex; }
+
+    .modal-content {
+      background: var(--card-bg);
+      width: 100%;
+      max-width: 450px;
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      color: var(--text-sub);
+      margin-bottom: 4px;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-color);
+      color: var(--text-color);
+      font-size: 15px;
+      outline: none;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-primary { background: var(--primary); color: var(--on-primary); }
+    .btn-secondary { background: var(--border-color); color: var(--text-color); }
+    .btn-danger { background: #ba1a1a; color: #ffffff; }
+
+    .tags-selector {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .tag-option {
+      padding: 6px 12px;
+      border-radius: 16px;
+      border: 1px solid var(--border-color);
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tag-option.selected {
+      border-color: var(--primary);
+      background: var(--primary-container);
+    }
+
+    .tag-manager-item {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    #qrCanvas {
+      display: block;
+      margin: 16px auto;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Шапка -->
+  <header>
+    <div class="courier-select-wrapper">
+      <button class="courier-btn" id="courierToggle">
+        <span id="currentCourierName">Курьер 1</span> ▾
+      </button>
+      <div class="dropdown-menu" id="courierMenu">
+        <button class="dropdown-item active" id="menuCourier1" onclick="switchCourier(1)">Курьер 1</button>
+        <button class="dropdown-item" id="menuCourier2" onclick="switchCourier(2)">Курьер 2</button>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" onclick="openQRModal()">📱</button>
+      <button class="icon-btn" onclick="openSettings()">⚙️</button>
+    </div>
+  </header>
+
+  <!-- Контейнер заказов -->
+  <div id="ordersContainer"></div>
+
+  <!-- Кнопка добавить -->
+  <button class="fab" onclick="openAddModal()">+</button>
+
+  <!-- Модалка: Добавление заказа -->
+  <div class="modal" id="orderModal">
+    <div class="modal-content">
+      <div class="modal-title" id="modalOrderTitle">Новый заказ</div>
+      <div class="form-group">
+        <label>Адрес</label>
+        <input type="text" id="inputAddress" class="form-control" placeholder="ул. Ленина, д. 10">
+      </div>
+      <div class="form-group">
+        <label>Количество товара</label>
+        <input type="number" id="inputQty" class="form-control" value="1" min="1">
+      </div>
+      <div class="form-group">
+        <label>Описание</label>
+        <textarea id="inputDesc" class="form-control" rows="2" placeholder="Комментарий..."></textarea>
+      </div>
+      
+      <div class="form-group" id="manualPriceGroup">
+        <label>Ручная цена (руб)</label>
+        <input type="number" id="inputPrice" class="form-control" placeholder="0">
+      </div>
+
+      <div class="form-group">
+        <label>Метки заказа</label>
+        <div class="tags-selector" id="tagsSelector"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal('orderModal')">Отмена</button>
+        <button class="btn btn-primary" onclick="saveOrder()">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: Контекстное меню -->
+  <div class="modal" id="contextModal">
+    <div class="modal-content">
+      <div class="modal-title">Управление заказом</div>
+      <div class="modal-actions" style="flex-direction: column;">
+        <button class="btn btn-primary" onclick="transferOrder()">Передать другому курьеру</button>
+        <button class="btn btn-danger" onclick="deleteOrder()">Удалить заказ</button>
+        <button class="btn btn-secondary" onclick="closeModal('contextModal')">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: Настройки -->
+  <div class="modal" id="settingsModal">
+    <div class="modal-content">
+      <div class="modal-title">Настройки</div>
+      
+      <div class="form-group">
+        <label>Имя Курьера 1</label>
+        <input type="text" id="settingCourier1Name" class="form-control">
+      </div>
+
+      <div class="form-group">
+        <label>Имя Курьера 2</label>
+        <input type="text" id="settingCourier2Name" class="form-control">
+      </div>
+
+      <div class="form-group">
+        <label>Темная тема</label>
+        <input type="checkbox" id="settingDarkTheme" onchange="toggleDarkTheme(this.checked)">
+      </div>
+
+      <div class="form-group">
+        <label>Вид плиток</label>
+        <select id="settingTileView" class="form-control">
+          <option value="normal">Обычные карточки</option>
+          <option value="compact">Компактные полоски</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Режим расчета цены</label>
+        <select id="settingPriceMode" class="form-control" onchange="togglePriceModeUI()">
+          <option value="auto">Авто-цена (по меткам)</option>
+          <option value="manual">Ручная цена</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="basePriceGroup">
+        <label>Базовая цена за 1 товар (руб)</label>
+        <input type="number" id="settingBasePrice" class="form-control" value="100">
+      </div>
+
+      <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 16px 0;">
+
+      <!-- Конструктор меток -->
+      <div class="form-group">
+        <label style="font-weight: 700; font-size: 14px; margin-bottom: 8px;">Конструктор меток</label>
+        <div id="customTagsList"></div>
+        <button class="btn btn-secondary" style="margin-top: 8px; width: 100%;" onclick="addCustomTagField()">+ Добавить новую метку</button>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal('settingsModal')">Закрыть</button>
+        <button class="btn btn-primary" onclick="saveSettings()">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: QR Код -->
+  <div class="modal" id="qrModal">
+    <div class="modal-content" style="text-align: center;">
+      <div class="modal-title">Передача без интернета</div>
+      <p style="font-size: 13px; color: var(--text-sub);">Отсканируйте QR-код другим устройством для получения заказов</p>
+      <div id="qrCanvas"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal('qrModal')">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyCEcUcNX09X5SUy5mrH8E8a-0aEqejZGm0",
+      authDomain: "appfd-91600.firebaseapp.com",
+      databaseURL: "https://appfd-91600-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "appfd-91600",
+      storageBucket: "appfd-91600.firebasestorage.app",
+      messagingSenderId: "425861601056",
+      appId: "1:425861601056:web:7beb05cb954d9ecade6945"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let currentCourierId = 1;
+    let selectedOrderIndex = null;
+    let touchTimer = null;
+
+    let settings = JSON.parse(localStorage.getItem('courier_settings')) || {
+      courier1Name: "Курьер 1",
+      courier2Name: "Курьер 2",
+      darkTheme: false,
+      tileView: "normal",
+      priceMode: "auto",
+      basePrice: 100,
+      customTags: []
+    };
+
+    let orders = JSON.parse(localStorage.getItem('courier_orders')) || {
+      1: [],
+      2: []
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+      applySettings();
+      renderOrders();
+      initSortable();
+
+      document.getElementById('courierToggle').addEventListener('click', () => {
+        document.getElementById('courierMenu').classList.toggle('show');
+      });
+
+      db.ref('courier_app/orders').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          orders = data;
+          localStorage.setItem('courier_orders', JSON.stringify(orders));
+          renderOrders();
+        }
+      });
+
+      db.ref('courier_app/settings').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          settings = data;
+          localStorage.setItem('courier_settings', JSON.stringify(settings));
+          applySettings();
+          renderOrders();
+        }
+      });
+    });
+
+    function switchCourier(id) {
+      currentCourierId = id;
+      document.getElementById('courierMenu').classList.remove('show');
+      document.querySelectorAll('.dropdown-item').forEach((btn, idx) => {
+        btn.classList.toggle('active', idx + 1 === id);
+      });
+      renderOrders();
+    }
+
+    function renderOrders() {
+      const container = document.getElementById('ordersContainer');
+      container.innerHTML = '';
+
+      const name1 = settings.courier1Name || "Курьер 1";
+      const name2 = settings.courier2Name || "Курьер 2";
+      document.getElementById('menuCourier1').innerText = name1;
+      document.getElementById('menuCourier2').innerText = name2;
+      document.getElementById('currentCourierName').innerText = currentCourierId === 1 ? name1 : name2;
+
+      const currentList = orders[currentCourierId] || [];
+
+      currentList.forEach((order, index) => {
+        const calculatedPrice = calculateOrderPrice(order);
+        const card = document.createElement('div');
+        
+        card.className = `order-card ${settings.tileView === 'compact' ? 'compact' : ''}`;
+        card.dataset.index = index;
+
+        const tagsHtml = (order.selectedTags || []).map(tId => {
+          const t = (settings.customTags || []).find(x => x.id === tId);
+          return t ? `<span class="tag-badge" style="background:${t.color}"></span>` : '';
+        }).join('');
+
+        if (settings.tileView === 'compact') {
+          card.innerHTML = `
+            <div class="order-address">${order.address}</div>
+            <div class="order-qty">${order.qty} шт</div>
+            <div class="order-price" style="margin-left: 10px;">${calculatedPrice} ₽</div>
+          `;
+        } else {
+          card.innerHTML = `
+            <div class="order-header">
+              <div class="order-address">${order.address}</div>
+              <div class="order-qty">${order.qty} шт.</div>
+            </div>
+            ${order.desc ? `<div class="order-desc">${order.desc}</div>` : ''}
+            <div class="order-footer">
+              <div class="order-tags">${tagsHtml}</div>
+              <div class="order-price">${calculatedPrice} ₽</div>
+            </div>
+          `;
+        }
+
+        card.addEventListener('touchstart', () => { touchTimer = setTimeout(() => openContextMenu(index), 600); });
+        card.addEventListener('touchend', () => clearTimeout(touchTimer));
+        card.addEventListener('mousedown', () => { touchTimer = setTimeout(() => openContextMenu(index), 600); });
+        card.addEventListener('mouseup', () => clearTimeout(touchTimer));
+
+        container.appendChild(card);
+      });
+    }
+
+    function calculateOrderPrice(order) {
+      if (settings.priceMode === 'manual') return order.price || 0;
+
+      let total = settings.basePrice * order.qty;
+      (order.selectedTags || []).forEach(tId => {
+        const tag = (settings.customTags || []).find(x => x.id === tId);
+        if (tag) {
+          const val = parseFloat(tag.val) || 0;
+          if (tag.type === 'percent') total += total * (val / 100);
+          if (tag.type === 'add') total += val;
+          if (tag.type === 'mult') total *= val;
+        }
+      });
+      return Math.round(total);
+    }
+
+    function initSortable() {
+      const container = document.getElementById('ordersContainer');
+      new Sortable(container, {
+        animation: 150,
+        onEnd: (evt) => {
+          const list = orders[currentCourierId];
+          const [movedItem] = list.splice(evt.oldIndex, 1);
+          list.splice(evt.newIndex, 0, movedItem);
+          saveAndSync();
+        }
+      });
+    }
+
+    function openAddModal() {
+      document.getElementById('modalOrderTitle').innerText = "Новый заказ";
+      document.getElementById('inputAddress').value = "";
+      document.getElementById('inputQty').value = "1";
+      document.getElementById('inputDesc').value = "";
+      document.getElementById('inputPrice').value = "";
+      
+      renderTagsSelector([]);
+      togglePriceModeUI();
+      openModal('orderModal');
+    }
+
+    function renderTagsSelector(selected) {
+      const container = document.getElementById('tagsSelector');
+      container.innerHTML = '';
+      
+      const tagsList = settings.customTags || [];
+      if (tagsList.length === 0) {
+        container.innerHTML = '<span style="font-size:13px; color:var(--text-sub);">Нет созданных меток. Добавьте их в настройках.</span>';
+        return;
+      }
+
+      tagsList.forEach(tag => {
+        const isSelected = selected.includes(tag.id);
+        const div = document.createElement('div');
+        div.className = `tag-option ${isSelected ? 'selected' : ''}`;
+        div.innerHTML = `<span class="tag-badge" style="background:${tag.color}"></span> ${tag.label}`;
+        div.onclick = () => { div.classList.toggle('selected'); };
+        div.dataset.id = tag.id;
+        container.appendChild(div);
+      });
+    }
+
+    function saveOrder() {
+      const address = document.getElementById('inputAddress').value.trim();
+      if (!address) return alert("Введите адрес!");
+
+      const selectedTags = Array.from(document.querySelectorAll('.tag-option.selected')).map(el => el.dataset.id);
+
+      const newOrder = {
+        id: Date.now().toString(),
+        address: address,
+        qty: parseInt(document.getElementById('inputQty').value) || 1,
+        desc: document.getElementById('inputDesc').value.trim(),
+        price: parseFloat(document.getElementById('inputPrice').value) || 0,
+        selectedTags: selectedTags
+      };
+
+      if (!orders[currentCourierId]) orders[currentCourierId] = [];
+      orders[currentCourierId].push(newOrder);
+
+      saveAndSync();
+      closeModal('orderModal');
+      renderOrders();
+    }
+
+    function openContextMenu(index) {
+      selectedOrderIndex = index;
+      openModal('contextModal');
+    }
+
+    function transferOrder() {
+      if (selectedOrderIndex === null) return;
+      const targetCourierId = currentCourierId === 1 ? 2 : 1;
+      const item = orders[currentCourierId].splice(selectedOrderIndex, 1)[0];
+      
+      if (!orders[targetCourierId]) orders[targetCourierId] = [];
+      orders[targetCourierId].push(item);
+
+      saveAndSync();
+      closeModal('contextModal');
+      renderOrders();
+    }
+
+    function deleteOrder() {
+      if (selectedOrderIndex === null) return;
+      orders[currentCourierId].splice(selectedOrderIndex, 1);
+      saveAndSync();
+      closeModal('contextModal');
+      renderOrders();
+    }
+
+    function openSettings() {
+      document.getElementById('settingCourier1Name').value = settings.courier1Name || "Курьер 1";
+      document.getElementById('settingCourier2Name').value = settings.courier2Name || "Курьер 2";
+      document.getElementById('settingDarkTheme').checked = settings.darkTheme;
+      document.getElementById('settingTileView').value = settings.tileView;
+      document.getElementById('settingPriceMode').value = settings.priceMode;
+      document.getElementById('settingBasePrice').value = settings.basePrice;
+
+      renderCustomTagsManager();
+      togglePriceModeUI();
+      openModal('settingsModal');
+    }
+
+    function renderCustomTagsManager() {
+      const container = document.getElementById('customTagsList');
+      container.innerHTML = '';
+
+      (settings.customTags || []).forEach((tag, idx) => {
+        const item = document.createElement('div');
+        item.className = 'tag-manager-item';
+        item.innerHTML = `
+          <input type="color" class="form-control" style="width: 40px; padding: 2px;" value="${tag.color}" data-idx="${idx}" class="tag-color">
+          <input type="text" class="form-control tag-name" placeholder="Название" value="${tag.label}" data-idx="${idx}">
+          <select class="form-control tag-type" style="width: 90px;" data-idx="${idx}">
+            <option value="add" ${tag.type === 'add' ? 'selected' : ''}>+руб</option>
+            <option value="percent" ${tag.type === 'percent' ? 'selected' : ''}>+%</option>
+            <option value="mult" ${tag.type === 'mult' ? 'selected' : ''}>xУмнож</option>
+          </select>
+          <input type="number" class="form-control tag-val" style="width: 65px;" placeholder="Знач" value="${tag.val}" data-idx="${idx}">
+          <button class="btn btn-danger" style="padding: 8px 10px; flex: none;" onclick="removeCustomTag(${idx})">✕</button>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function addCustomTagField() {
+      if (!settings.customTags) settings.customTags = [];
+      settings.customTags.push({
+        id: 'tag_' + Date.now(),
+        color: '#ff4d4d',
+        label: 'Новая метка',
+        type: 'add',
+        val: 50
+      });
+      renderCustomTagsManager();
+    }
+
+    function removeCustomTag(idx) {
+      settings.customTags.splice(idx, 1);
+      renderCustomTagsManager();
+    }
+
+    function saveSettings() {
+      settings.courier1Name = document.getElementById('settingCourier1Name').value.trim() || "Курьер 1";
+      settings.courier2Name = document.getElementById('settingCourier2Name').value.trim() || "Курьер 2";
+      settings.darkTheme = document.getElementById('settingDarkTheme').checked;
+      settings.tileView = document.getElementById('settingTileView').value;
+      settings.priceMode = document.getElementById('settingPriceMode').value;
+      settings.basePrice = parseFloat(document.getElementById('settingBasePrice').value) || 100;
+
+      const tagItems = document.querySelectorAll('.tag-manager-item');
+      const updatedTags = [];
+      tagItems.forEach(item => {
+        const color = item.querySelector('.tag-color')?.value || item.querySelector('input[type="color"]').value;
+        const label = item.querySelector('.tag-name').value.trim() || 'Метка';
+        const type = item.querySelector('.tag-type').value;
+        const val = parseFloat(item.querySelector('.tag-val').value) || 0;
+        const existingId = settings.customTags[item.querySelector('.tag-name').dataset.idx]?.id || ('tag_' + Math.random());
+
+        updatedTags.push({ id: existingId, color, label, type, val });
+      });
+      settings.customTags = updatedTags;
+
+      localStorage.setItem('courier_settings', JSON.stringify(settings));
+      db.ref('courier_app/settings').set(settings);
+
+      applySettings();
+      closeModal('settingsModal');
+      renderOrders();
+    }
+
+    function applySettings() {
+      document.body.classList.toggle('dark-mode', settings.darkTheme);
+    }
+
+    function togglePriceModeUI() {
+      const isManual = (document.getElementById('settingPriceMode')?.value || settings.priceMode) === 'manual';
+      document.getElementById('manualPriceGroup').style.display = isManual ? 'block' : 'none';
+      const baseGroup = document.getElementById('basePriceGroup');
+      if (baseGroup) baseGroup.style.display = isManual ? 'none' : 'block';
+    }
+
+    function toggleDarkTheme(isDark) {
+      document.body.classList.toggle('dark-mode', isDark);
+    }
+
+    function openQRModal() {
+      const container = document.getElementById('qrCanvas');
+      container.innerHTML = '';
+      
+      const jsonString = JSON.stringify(orders[currentCourierId] || []);
+      new QRCode(container, {
+        text: jsonString,
+        width: 200,
+        height: 200
+      });
+
+      openModal('qrModal');
+    }
+
+    function saveAndSync() {
+      localStorage.setItem('courier_orders', JSON.stringify(orders));
+      db.ref('courier_app/orders').set(orders);
+    }
+
+    function openModal(id) { document.getElementById(id).classList.add('show'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+  </script>
+</body>
+</html>
