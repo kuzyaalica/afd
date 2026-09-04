@@ -1,5 +1,5 @@
 // Меняй версию (например, v2, v3), когда вносишь правки в HTML
-const CACHE_NAME = 'courier-app-v3';
+const CACHE_NAME = 'courier-app-v4';
 const ASSETS = [
   './',
   './index.html',
