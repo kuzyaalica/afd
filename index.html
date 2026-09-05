@@ -3,11 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Водица</title>
+  <title>Курьер Экспресс</title>
   
-  <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0061a4">
+  <meta name="theme-color" content="#212121">
 
   <script>
     if ('serviceWorker' in navigator) {
@@ -26,7 +25,7 @@
     }
   </script>
   
-  <!-- Firebase SDK -->
+  <!-- Firebase SDK (v9+ compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
@@ -36,29 +35,51 @@
 
   <style>
     :root {
-      --bg-color: #f4f5f9;
+      --bg-color: #f4f4f5;
       --card-bg: #ffffff;
-      --text-color: #1c1b1f;
-      --text-sub: #606060;
-      --primary: #0061a4;
-      --primary-container: #d1e4ff;
-      --on-primary: #ffffff;
-      --border-color: #e0e2ec;
-      --shadow: 0 2px 6px rgba(0,0,0,0.06);
-      --card-radius: 8px;
-      --transition: all 0.2s ease-in-out;
+      --text-color: #18181b;
+      --text-sub: #71717a;
+      --primary: #2563eb;
+      --primary-active: #1d4ed8;
+      --border-color: #e4e4e7;
+      --shadow: 0 1px 3px rgba(0,0,0,0.05);
+      --radius: 6px;
+
+      /* Цвета статусов */
+      --status-pending-bg: #fef2f2;
+      --status-pending-text: #dc2626;
+      --status-pending-border: #fecaca;
+
+      --status-transit-bg: #fefce8;
+      --status-transit-text: #ca8a04;
+      --status-transit-border: #fef08a;
+
+      --status-done-bg: #f0fdf4;
+      --status-done-text: #16a34a;
+      --status-done-border: #bbf7d0;
     }
 
     body.dark-mode {
-      --bg-color: #121316;
-      --card-bg: #1e1f23;
-      --text-color: #e2e2e6;
-      --text-sub: #8e9099;
-      --primary: #a8c7ff;
-      --primary-container: #004778;
-      --on-primary: #003052;
-      --border-color: #2e3036;
-      --shadow: 0 2px 6px rgba(0,0,0,0.25);
+      --bg-color: #09090b;
+      --card-bg: #18181b;
+      --text-color: #f4f4f5;
+      --text-sub: #a1a1aa;
+      --primary: #3b82f6;
+      --primary-active: #60a5fa;
+      --border-color: #27272a;
+      --shadow: 0 1px 3px rgba(0,0,0,0.4);
+
+      --status-pending-bg: #450a0a;
+      --status-pending-text: #fca5a5;
+      --status-pending-border: #7f1d1d;
+
+      --status-transit-bg: #422006;
+      --status-transit-text: #fde047;
+      --status-transit-border: #713f12;
+
+      --status-done-bg: #052e16;
+      --status-done-text: #86efac;
+      --status-done-border: #14532d;
     }
 
     * {
@@ -72,139 +93,145 @@
     body {
       background-color: var(--bg-color);
       color: var(--text-color);
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
-      transition: background-color 0.3s, color 0.3s;
+      padding-bottom: 80px;
+      transition: background-color 0.15s ease, color 0.15s ease;
     }
 
-    /* Анимация обновления при свайпе */
-    #pull-refresh {
-      position: absolute;
-      top: -45px;
-      left: 50%;
-      transform: translateX(-50%);
-      height: 32px;
-      width: 32px;
-      background: var(--card-bg);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: var(--shadow);
-      z-index: 100;
-      transition: top 0.2s ease;
+    /* Анимации в стиле быстрых переходов */
+    .animate-pop {
+      transition: transform 0.1s ease, background-color 0.15s ease, opacity 0.15s ease;
     }
 
-    #pull-refresh svg {
-      width: 18px;
-      height: 18px;
-      fill: var(--primary);
+    .animate-pop:active {
+      transform: scale(0.97);
     }
 
     header {
-      background: var(--card-bg);
+      position: sticky;
+      top: 0;
+      background-color: var(--card-bg);
       padding: 10px 16px;
       display: flex;
-      align-items: center;
       justify-content: space-between;
+      align-items: center;
       border-bottom: 1px solid var(--border-color);
-      box-shadow: var(--shadow);
-      z-index: 10;
+      z-index: 100;
     }
 
-    /* Прозрачная кнопка курьера */
-    .courier-select-btn {
-      background: transparent;
-      border: none;
+    .courier-btn {
+      background: var(--bg-color);
       color: var(--text-color);
-      font-size: 16px;
+      border: 1px solid var(--border-color);
+      padding: 6px 12px;
+      border-radius: var(--radius);
       font-weight: 600;
+      font-size: 14px;
       display: flex;
       align-items: center;
       gap: 6px;
       cursor: pointer;
-      padding: 4px 8px;
-      border-radius: var(--card-radius);
-      transition: var(--transition);
-    }
-    .courier-select-btn:active {
-      opacity: 0.6;
-    }
-    .courier-select-btn svg {
-      width: 12px;
-      height: 12px;
-      fill: var(--text-color);
     }
 
     .header-actions {
       display: flex;
-      gap: 8px;
+      gap: 6px;
     }
 
     .icon-btn {
-      background: transparent;
-      border: none;
+      background: var(--bg-color);
+      border: 1px solid var(--border-color);
+      font-size: 16px;
       color: var(--text-color);
       width: 36px;
       height: 36px;
-      border-radius: var(--card-radius);
+      border-radius: var(--radius);
+      cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
+    }
+
+    .dropdown-menu {
+      position: absolute;
+      top: 100%;
+      left: 16px;
+      margin-top: 4px;
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      border: 1px solid var(--border-color);
+      width: 180px;
+      display: none;
+      flex-direction: column;
+      box-shadow: var(--shadow);
+      z-index: 101;
+      overflow: hidden;
+    }
+
+    .dropdown-menu.show { display: flex; }
+
+    .dropdown-item {
+      padding: 10px 14px;
+      background: none;
+      border: none;
+      text-align: left;
+      color: var(--text-color);
+      font-size: 14px;
       cursor: pointer;
-      transition: var(--transition);
     }
-    .icon-btn:active {
-      background: var(--border-color);
-      transform: scale(0.95);
-    }
-    .icon-btn svg {
-      width: 20px;
-      height: 20px;
-      fill: var(--text-color);
+
+    .dropdown-item.active {
+      background: var(--primary);
+      color: #ffffff;
     }
 
     /* Список заказов */
-    #orders-container {
-      flex: 1;
-      overflow-y: auto;
-      padding: 12px;
+    #ordersContainer {
+      padding: 12px 16px;
       display: flex;
       flex-direction: column;
       gap: 8px;
+      max-width: 600px;
+      margin: 0 auto;
     }
 
     .order-card {
       background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 12px 14px;
       border: 1px solid var(--border-color);
-      border-radius: var(--card-radius);
-      padding: 10px 12px;
       box-shadow: var(--shadow);
+      position: relative;
+      user-select: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .order-card.compact {
+      padding: 8px 12px;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .order-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      user-select: none;
-      animation: fadeIn 0.2s ease-out;
-      transition: var(--transition);
-    }
-
-    .order-card:active {
-      transform: scale(0.99);
-    }
-
-    .order-info {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      flex: 1;
     }
 
     .order-address {
-      font-size: 15px;
       font-weight: 600;
-      color: var(--text-color);
+      font-size: 15px;
+    }
+
+    .order-qty {
+      font-size: 12px;
+      color: var(--text-sub);
+      background: var(--bg-color);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
     }
 
     .order-desc {
@@ -212,65 +239,103 @@
       color: var(--text-sub);
     }
 
-    .order-meta {
+    .order-footer {
       display: flex;
+      justify-content: space-between;
       align-items: center;
-      gap: 10px;
+      margin-top: 4px;
     }
 
-    .order-count {
-      font-size: 13px;
-      background: var(--primary-container);
-      color: var(--primary);
-      padding: 2px 6px;
-      border-radius: 4px;
+    .status-badge {
+      font-size: 12px;
       font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      cursor: pointer;
+    }
+
+    .status-pending {
+      background: var(--status-pending-bg);
+      color: var(--status-pending-text);
+      border-color: var(--status-pending-border);
+    }
+
+    .status-transit {
+      background: var(--status-transit-bg);
+      color: var(--status-transit-text);
+      border-color: var(--status-transit-border);
+    }
+
+    .status-done {
+      background: var(--status-done-bg);
+      color: var(--status-done-text);
+      border-color: var(--status-done-border);
     }
 
     .order-price {
-      font-size: 15px;
       font-weight: 700;
-      color: var(--primary);
+      font-size: 15px;
     }
 
-    /* Модальные окна */
-    .modal-overlay {
+    /* FAB */
+    .fab {
       position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.4);
+      bottom: 20px;
+      right: 20px;
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      width: 50px;
+      height: 50px;
+      border-radius: var(--radius);
+      font-size: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 16px;
-      z-index: 1000;
-      opacity: 0;
-      pointer-events: none;
-      transition: var(--transition);
+      z-index: 90;
     }
 
-    .modal-overlay.active {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
+    /* Модальные окна */
     .modal {
-      background: var(--card-bg);
-      border-radius: var(--card-radius);
-      width: 100%;
-      max-width: 360px;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.4);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 200;
       padding: 16px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-      transform: translateY(10px);
-      transition: var(--transition);
+      opacity: 0;
+      transition: opacity 0.15s ease;
     }
 
-    .modal-overlay.active .modal {
-      transform: translateY(0);
+    .modal.show {
+      display: flex;
+      opacity: 1;
+    }
+
+    .modal-content {
+      background: var(--card-bg);
+      width: 100%;
+      max-width: 400px;
+      border-radius: var(--radius);
+      padding: 16px;
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow);
+      transform: scale(0.95);
+      transition: transform 0.15s ease;
+    }
+
+    .modal.show .modal-content {
+      transform: scale(1);
     }
 
     .modal-title {
-      font-size: 17px;
-      font-weight: 600;
+      font-size: 16px;
+      font-weight: 700;
       margin-bottom: 12px;
     }
 
@@ -288,8 +353,8 @@
     .form-control {
       width: 100%;
       padding: 8px 10px;
+      border-radius: var(--radius);
       border: 1px solid var(--border-color);
-      border-radius: var(--card-radius);
       background: var(--bg-color);
       color: var(--text-color);
       font-size: 14px;
@@ -298,484 +363,450 @@
 
     .modal-actions {
       display: flex;
-      justify-content: flex-end;
       gap: 8px;
       margin-top: 16px;
     }
 
     .btn {
-      padding: 8px 14px;
-      border-radius: var(--card-radius);
-      border: none;
+      flex: 1;
+      padding: 10px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border-color);
+      font-weight: 600;
       font-size: 14px;
-      font-weight: 500;
       cursor: pointer;
-      transition: var(--transition);
+      background: var(--bg-color);
+      color: var(--text-color);
     }
 
-    .btn-primary {
-      background: var(--primary);
-      color: var(--on-primary);
-    }
+    .btn-primary { background: var(--primary); color: #ffffff; border: none; }
+    .btn-danger { background: #dc2626; color: #ffffff; border: none; }
 
-    .btn-secondary {
-      background: transparent;
-      color: var(--text-sub);
-    }
-
-    .btn-danger {
-      background: #ba1a1a;
-      color: #ffffff;
-    }
-
-    .btn:active {
-      opacity: 0.8;
-      transform: scale(0.96);
-    }
-
-    #qrcode-container {
+    #qrCanvas {
       display: flex;
       justify-content: center;
-      margin: 16px 0;
+      margin: 12px 0;
     }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(4px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .fab {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      width: 48px;
-      height: 48px;
-      border-radius: var(--card-radius);
-      background: var(--primary);
-      color: var(--on-primary);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: var(--shadow);
-      cursor: pointer;
-      border: none;
-      transition: var(--transition);
-    }
-    .fab:active {
-      transform: scale(0.9);
-    }
-    .fab svg {
-      width: 24px;
-      height: 24px;
-      fill: var(--on-primary);
+    #qrScannerInput {
+      display: none;
     }
   </style>
 </head>
 <body>
 
-  <div id="pull-refresh">
-    <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-  </div>
-
   <header>
-    <button class="courier-select-btn" id="courierBtn">
-      <span id="currentCourierName">Курьер 1</span>
-      <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
-    </button>
+    <div style="position: relative;">
+      <button class="courier-btn animate-pop" id="courierToggle">
+        <span id="currentCourierName">Курьер 1</span> ▾
+      </button>
+      <div class="dropdown-menu" id="courierMenu">
+        <button class="dropdown-item active" id="menuCourier1" onclick="switchCourier(1)">Курьер 1</button>
+        <button class="dropdown-item" id="menuCourier2" onclick="switchCourier(2)">Курьер 2</button>
+      </div>
+    </div>
     <div class="header-actions">
-      <!-- Иконка Поделиться (QR-код) -->
-      <button class="icon-btn" id="qrBtn" title="QR-код">
-        <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
-      </button>
-      <!-- Иконка Шестеренка (Настройки) -->
-      <button class="icon-btn" id="settingsBtn" title="Настройки">
-        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
-      </button>
+      <button class="icon-btn animate-pop" onclick="openQRModal()" title="QR-код">📱</button>
+      <button class="icon-btn animate-pop" onclick="openSettings()" title="Настройки">⚙️</button>
     </div>
   </header>
 
-  <div id="orders-container"></div>
+  <div id="ordersContainer"></div>
 
-  <button class="fab" id="addOrderBtn">
-    <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-  </button>
+  <button class="fab animate-pop" onclick="openAddModal()">+</button>
 
-  <!-- Модальное окно заказа -->
-  <div class="modal-overlay" id="orderModal">
-    <div class="modal">
-      <div class="modal-title" id="orderModalTitle">Новый заказ</div>
+  <!-- Добавление/Редактирование заказа -->
+  <div class="modal" id="orderModal">
+    <div class="modal-content">
+      <div class="modal-title" id="modalOrderTitle">Новый заказ</div>
       <div class="form-group">
         <label>Адрес</label>
-        <input type="text" class="form-control" id="orderAddress" placeholder="Улица, дом, кв">
+        <input type="text" id="inputAddress" class="form-control" placeholder="ул. Ленина, д. 10">
       </div>
       <div class="form-group">
-        <label>Описание</label>
-        <input type="text" class="form-control" id="orderDesc" placeholder="Заметки">
+        <label>Количество товара</label>
+        <input type="number" id="inputQty" class="form-control" value="1" min="1">
       </div>
       <div class="form-group">
-        <label>Количество (шт)</label>
-        <input type="number" class="form-control" id="orderCount" value="1">
+        <label>Описание (необязательно)</label>
+        <textarea id="inputDesc" class="form-control" rows="2" placeholder="Комментарий к заказу..."></textarea>
       </div>
       <div class="form-group">
-        <label>Цена (ручная)</label>
-        <input type="number" class="form-control" id="orderPrice" placeholder="0">
+        <label>Цена (руб)</label>
+        <input type="number" id="inputPrice" class="form-control" placeholder="0">
       </div>
+
       <div class="modal-actions">
-        <button class="btn btn-secondary" id="cancelOrderBtn">Отмена</button>
-        <button class="btn btn-primary" id="saveOrderBtn">Сохранить</button>
+        <button class="btn animate-pop" onclick="closeModal('orderModal')">Отмена</button>
+        <button class="btn btn-primary animate-pop" onclick="saveOrder()">Сохранить</button>
       </div>
     </div>
   </div>
 
-  <!-- Контекстное меню заказа -->
-  <div class="modal-overlay" id="contextModal">
-    <div class="modal">
+  <!-- Контекстное меню -->
+  <div class="modal" id="contextModal">
+    <div class="modal-content">
       <div class="modal-title">Действия с заказом</div>
-      <div class="modal-actions" style="flex-direction: column; gap: 8px;">
-        <button class="btn btn-primary" id="ctxEditBtn">Редактировать</button>
-        <button class="btn btn-danger" id="ctxDeleteBtn">Удалить заказ</button>
-        <button class="btn btn-secondary" id="ctxCloseBtn">Закрыть</button>
+      <div class="modal-actions" style="flex-direction: column;">
+        <button class="btn btn-primary animate-pop" onclick="transferOrder()">Передать другому курьеру</button>
+        <button class="btn btn-danger animate-pop" onclick="deleteOrder()">Удалить заказ</button>
+        <button class="btn animate-pop" onclick="closeModal('contextModal')">Отмена</button>
       </div>
     </div>
   </div>
 
-  <!-- Модалка QR-кода -->
-  <div class="modal-overlay" id="qrModal">
-    <div class="modal">
-      <div class="modal-title">QR-код приложения</div>
-      <div id="qrcode-container"></div>
-      <div class="modal-actions">
-        <button class="btn btn-secondary" id="closeQrBtn">Закрыть</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Модалка Настроек -->
-  <div class="modal-overlay" id="settingsModal">
-    <div class="modal">
+  <!-- Настройки -->
+  <div class="modal" id="settingsModal">
+    <div class="modal-content">
       <div class="modal-title">Настройки</div>
+      
       <div class="form-group">
-        <label>Авто-синхронизация</label>
-        <select class="form-control" id="syncIntervalSelect">
+        <label>Имя Курьера 1</label>
+        <input type="text" id="settingCourier1Name" class="form-control">
+      </div>
+
+      <div class="form-group">
+        <label>Имя Курьера 2</label>
+        <input type="text" id="settingCourier2Name" class="form-control">
+      </div>
+
+      <div class="form-group">
+        <label>Темная тема</label>
+        <input type="checkbox" id="settingDarkTheme" onchange="toggleDarkTheme(this.checked)">
+      </div>
+
+      <div class="form-group">
+        <label>Вид карточек</label>
+        <select id="settingTileView" class="form-control">
+          <option value="normal">Обычные</option>
+          <option value="compact">Компактные</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Частота авто-синхронизации</label>
+        <select id="settingSyncInterval" class="form-control">
           <option value="5000">Каждые 5 секунд</option>
-          <option value="60000">Раз в минуту</option>
-          <option value="0">Отключить</option>
+          <option value="60000">Каждую 1 минуту</option>
+          <option value="0">Без авто-синхронизации</option>
         </select>
       </div>
+
       <div class="form-group">
-        <label>Тёмная тема</label>
-        <select class="form-control" id="themeSelect">
-          <option value="light">Светлая</option>
-          <option value="dark">Тёмная</option>
+        <label>Режим работы QR-кода</label>
+        <select id="settingQrMode" class="form-control">
+          <option value="replace">Заменять текущие заказы</option>
+          <option value="merge_no_dup">Добавлять новые (без дубликатов)</option>
+          <option value="merge_all">Добавлять всё (с дубликатами)</option>
         </select>
       </div>
+
       <div class="modal-actions">
-        <button class="btn btn-primary" id="closeSettingsBtn">Готово</button>
+        <button class="btn animate-pop" onclick="closeModal('settingsModal')">Закрыть</button>
+        <button class="btn btn-primary animate-pop" onclick="saveSettings()">Сохранить</button>
       </div>
     </div>
   </div>
 
-  <!-- Модалка Выбора Курьера -->
-  <div class="modal-overlay" id="courierModal">
-    <div class="modal">
-      <div class="modal-title">Выберите курьера</div>
-      <div class="form-group">
-        <select class="form-control" id="courierSelect">
-          <option value="Курьер 1">Курьер 1</option>
-          <option value="Курьер 2">Курьер 2</option>
-          <option value="Курьер 3">Курьер 3</option>
-        </select>
-      </div>
-      <div class="modal-actions">
-        <button class="btn btn-primary" id="closeCourierBtn">Применить</button>
+  <!-- QR Модалка -->
+  <div class="modal" id="qrModal">
+    <div class="modal-content" style="text-align: center;">
+      <div class="modal-title">Передача заказов</div>
+      <div id="qrCanvas"></div>
+      
+      <input type="file" id="qrScannerInput" accept="image/*" onchange="readQrImage(this)">
+      
+      <div class="modal-actions" style="flex-direction: column; gap: 6px;">
+        <button class="btn btn-primary animate-pop" onclick="document.getElementById('qrScannerInput').click()">Сканировать / Загрузить QR</button>
+        <button class="btn animate-pop" onclick="closeModal('qrModal')">Закрыть</button>
       </div>
     </div>
   </div>
 
   <script>
-    // Тестовая/Локальная конфигурация базы Firebase
     const firebaseConfig = {
-      databaseURL: "https://vodica-default-rtdb.firebaseio.com/"
+      apiKey: "AIzaSyCEcUcNX09X5SUy5mrH8E8a-0aEqejZGm0",
+      authDomain: "appfd-91600.firebaseapp.com",
+      databaseURL: "https://appfd-91600-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "appfd-91600",
+      storageBucket: "appfd-91600.firebasestorage.app",
+      messagingSenderId: "425861601056",
+      appId: "1:425861601056:web:7beb05cb954d9ecade6945"
     };
 
-    let db = null;
-    try {
-      if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-      }
-      db = firebase.database();
-    } catch(e) {
-      console.log("Firebase не подключен, синхронизация работает локально.");
-    }
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-    // Состояние приложения
-    let appState = {
-      courier: localStorage.getItem('v_courier') || 'Курьер 1',
-      syncInterval: parseInt(localStorage.getItem('v_sync') || '5000'),
-      theme: localStorage.getItem('v_theme') || 'light',
-      orders: JSON.parse(localStorage.getItem('v_orders_local') || '[]')
-    };
-
-    let selectedOrderId = null;
-    let editingOrderId = null;
+    let currentCourierId = 1;
+    let selectedOrderIndex = null;
+    let touchTimer = null;
     let syncTimer = null;
 
-    // Применение темы
-    function applyTheme() {
-      if (appState.theme === 'dark') {
-        document.body.classList.add('dark-mode');
-      } else {
-        document.body.classList.remove('dark-mode');
-      }
-    }
-    applyTheme();
+    let settings = JSON.parse(localStorage.getItem('courier_settings')) || {
+      courier1Name: "Курьер 1",
+      courier2Name: "Курьер 2",
+      darkTheme: false,
+      tileView: "normal",
+      syncInterval: "5000",
+      qrMode: "merge_no_dup"
+    };
 
-    document.getElementById('currentCourierName').innerText = appState.courier;
-    document.getElementById('syncIntervalSelect').value = appState.syncInterval;
-    document.getElementById('themeSelect').value = appState.theme;
-    document.getElementById('courierSelect').value = appState.courier;
+    let orders = JSON.parse(localStorage.getItem('courier_orders')) || { 1: [], 2: [] };
 
-    // Получение и сохранение данных
-    function fetchFromFirebase() {
-      localStorage.setItem('v_orders_local', JSON.stringify(appState.orders));
-      if (!db) { renderOrders(); return; }
+    document.addEventListener("DOMContentLoaded", () => {
+      applySettings();
+      renderOrders();
+      initSortable();
+      setupAutoSync();
 
-      db.ref('orders/' + appState.courier).once('value', (snapshot) => {
+      document.getElementById('courierToggle').addEventListener('click', () => {
+        document.getElementById('courierMenu').classList.toggle('show');
+      });
+
+      // Фоновое слушание изменений Firebase
+      db.ref('courier_app/orders').on('value', (snapshot) => {
         const data = snapshot.val();
         if (data) {
-          appState.orders = Array.isArray(data) ? data : Object.values(data);
-          localStorage.setItem('v_orders_local', JSON.stringify(appState.orders));
+          orders = data;
+          localStorage.setItem('courier_orders', JSON.stringify(orders));
+          renderOrders();
         }
-        renderOrders();
-      }).catch(() => {
-        renderOrders();
+      });
+    });
+
+    function switchCourier(id) {
+      currentCourierId = id;
+      document.getElementById('courierMenu').classList.remove('show');
+      document.querySelectorAll('.dropdown-item').forEach((btn, idx) => {
+        btn.classList.toggle('active', idx + 1 === id);
+      });
+      renderOrders();
+    }
+
+    function renderOrders() {
+      const container = document.getElementById('ordersContainer');
+      container.innerHTML = '';
+
+      const name1 = settings.courier1Name || "Курьер 1";
+      const name2 = settings.courier2Name || "Курьер 2";
+      document.getElementById('menuCourier1').innerText = name1;
+      document.getElementById('menuCourier2').innerText = name2;
+      document.getElementById('currentCourierName').innerText = currentCourierId === 1 ? name1 : name2;
+
+      const currentList = orders[currentCourierId] || [];
+
+      currentList.forEach((order, index) => {
+        const card = document.createElement('div');
+        card.className = `order-card animate-pop ${settings.tileView === 'compact' ? 'compact' : ''}`;
+        card.dataset.index = index;
+
+        const statusMap = {
+          'pending': { text: 'Не доставлен', class: 'status-pending' },
+          'transit': { text: 'В пути', class: 'status-transit' },
+          'done': { text: 'Доставлен', class: 'status-done' }
+        };
+
+        const statusInfo = statusMap[order.status || 'pending'];
+
+        if (settings.tileView === 'compact') {
+          card.innerHTML = `
+            <div class="order-address">${order.address}</div>
+            <div class="status-badge ${statusInfo.class}" onclick="cycleStatus(event, ${index})">${statusInfo.text}</div>
+            <div class="order-price">${order.price || 0} ₽</div>
+          `;
+        } else {
+          card.innerHTML = `
+            <div class="order-header">
+              <div class="order-address">${order.address}</div>
+              <div class="order-qty">${order.qty} шт.</div>
+            </div>
+            ${order.desc ? `<div class="order-desc">${order.desc}</div>` : ''}
+            <div class="order-footer">
+              <div class="status-badge ${statusInfo.class}" onclick="cycleStatus(event, ${index})">${statusInfo.text}</div>
+              <div class="order-price">${order.price || 0} ₽</div>
+            </div>
+          `;
+        }
+
+        // Долгое нажатие для меню
+        card.addEventListener('touchstart', () => { touchTimer = setTimeout(() => openContextMenu(index), 500); });
+        card.addEventListener('touchend', () => clearTimeout(touchTimer));
+        card.addEventListener('mousedown', () => { touchTimer = setTimeout(() => openContextMenu(index), 500); });
+        card.addEventListener('mouseup', () => clearTimeout(touchTimer));
+
+        container.appendChild(card);
       });
     }
 
-    function saveToFirebase() {
-      localStorage.setItem('v_orders_local', JSON.stringify(appState.orders));
-      if (db) {
-        db.ref('orders/' + appState.courier).set(appState.orders);
-      }
+    function cycleStatus(event, index) {
+      event.stopPropagation();
+      const currentList = orders[currentCourierId];
+      const statuses = ['pending', 'transit', 'done'];
+      let nextIdx = (statuses.indexOf(currentList[index].status || 'pending') + 1) % statuses.length;
+      currentList[index].status = statuses[nextIdx];
+      saveAndSync();
+      renderOrders();
+    }
+
+    function initSortable() {
+      new Sortable(document.getElementById('ordersContainer'), {
+        animation: 150,
+        onEnd: (evt) => {
+          const list = orders[currentCourierId];
+          const [moved] = list.splice(evt.oldIndex, 1);
+          list.splice(evt.newIndex, 0, moved);
+          saveAndSync();
+        }
+      });
+    }
+
+    function openAddModal() {
+      document.getElementById('modalOrderTitle').innerText = "Новый заказ";
+      document.getElementById('inputAddress').value = "";
+      document.getElementById('inputQty').value = "1";
+      document.getElementById('inputDesc').value = "";
+      document.getElementById('inputPrice').value = "";
+      openModal('orderModal');
+    }
+
+    function saveOrder() {
+      const address = document.getElementById('inputAddress').value.trim();
+      if (!address) return alert("Введите адрес!");
+
+      const newOrder = {
+        id: 'ord_' + Date.now(),
+        address: address,
+        qty: parseInt(document.getElementById('inputQty').value) || 1,
+        desc: document.getElementById('inputDesc').value.trim(),
+        price: parseFloat(document.getElementById('inputPrice').value) || 0,
+        status: 'pending'
+      };
+
+      if (!orders[currentCourierId]) orders[currentCourierId] = [];
+      orders[currentCourierId].push(newOrder);
+
+      saveAndSync();
+      closeModal('orderModal');
+      renderOrders();
+    }
+
+    function openContextMenu(index) {
+      selectedOrderIndex = index;
+      openModal('contextModal');
+    }
+
+    function transferOrder() {
+      if (selectedOrderIndex === null) return;
+      const targetId = currentCourierId === 1 ? 2 : 1;
+      const item = orders[currentCourierId].splice(selectedOrderIndex, 1)[0];
+      
+      if (!orders[targetId]) orders[targetId] = [];
+      orders[targetId].push(item);
+
+      saveAndSync();
+      closeModal('contextModal');
+      renderOrders();
+    }
+
+    function deleteOrder() {
+      if (selectedOrderIndex === null) return;
+      orders[currentCourierId].splice(selectedOrderIndex, 1);
+      saveAndSync();
+      closeModal('contextModal');
+      renderOrders();
+    }
+
+    function openSettings() {
+      document.getElementById('settingCourier1Name').value = settings.courier1Name || "Курьер 1";
+      document.getElementById('settingCourier2Name').value = settings.courier2Name || "Курьер 2";
+      document.getElementById('settingDarkTheme').checked = settings.darkTheme;
+      document.getElementById('settingTileView').value = settings.tileView;
+      document.getElementById('settingSyncInterval').value = settings.syncInterval || "5000";
+      document.getElementById('settingQrMode').value = settings.qrMode || "merge_no_dup";
+      openModal('settingsModal');
+    }
+
+    function saveSettings() {
+      settings.courier1Name = document.getElementById('settingCourier1Name').value.trim() || "Курьер 1";
+      settings.courier2Name = document.getElementById('settingCourier2Name').value.trim() || "Курьер 2";
+      settings.darkTheme = document.getElementById('settingDarkTheme').checked;
+      settings.tileView = document.getElementById('settingTileView').value;
+      settings.syncInterval = document.getElementById('settingSyncInterval').value;
+      settings.qrMode = document.getElementById('settingQrMode').value;
+
+      localStorage.setItem('courier_settings', JSON.stringify(settings));
+      applySettings();
+      setupAutoSync();
+      closeModal('settingsModal');
+      renderOrders();
+    }
+
+    function applySettings() {
+      document.body.classList.toggle('dark-mode', settings.darkTheme);
     }
 
     function setupAutoSync() {
       if (syncTimer) clearInterval(syncTimer);
-      if (appState.syncInterval > 0) {
+      const interval = parseInt(settings.syncInterval);
+      if (interval > 0) {
         syncTimer = setInterval(() => {
-          fetchFromFirebase();
-        }, appState.syncInterval);
+          if (navigator.onLine) saveAndSync();
+        }, interval);
       }
     }
 
-    // Отрисовка карточек заказов
-    const ordersContainer = document.getElementById('orders-container');
+    function openQRModal() {
+      const container = document.getElementById('qrCanvas');
+      container.innerHTML = '';
+      openModal('qrModal');
 
-    function renderOrders() {
-      ordersContainer.innerHTML = '';
-      appState.orders.forEach((order) => {
-        const card = document.createElement('div');
-        card.className = 'order-card';
-        card.dataset.id = order.id;
+      setTimeout(() => {
+        const dataStr = JSON.stringify(orders[currentCourierId] || []);
+        if (typeof QRCode !== 'undefined') {
+          new QRCode(container, {
+            text: dataStr,
+            width: 180,
+            height: 180,
+            correctLevel: QRCode.CorrectLevel.L
+          });
+        }
+      }, 50);
+    }
 
-        card.innerHTML = `
-          <div class="order-info">
-            <div class="order-address">${escapeHtml(order.address || 'Без адреса')}</div>
-            ${order.desc ? `<div class="order-desc">${escapeHtml(order.desc)}</div>` : ''}
-          </div>
-          <div class="order-meta">
-            <div class="order-count">${order.count || 1} шт</div>
-            <div class="order-price">${order.price || 0} ₽</div>
-          </div>
-        `;
+    function applyImportedOrders(importedList) {
+      const mode = settings.qrMode || "merge_no_dup";
+      let currentList = orders[currentCourierId] || [];
 
-        // Двойной быстрый тап (< 1000мс)
-        let lastTap = 0;
-        card.addEventListener('touchend', (e) => {
-          const currentTime = new Date().getTime();
-          const tapLength = currentTime - lastTap;
-          if (tapLength < 1000 && tapLength > 0) {
-            openContextMenu(order.id);
-            e.preventDefault();
-            lastTap = 0;
-          } else {
-            lastTap = currentTime;
+      if (mode === 'replace') {
+        currentList = importedList;
+      } else if (mode === 'merge_no_dup') {
+        importedList.forEach(item => {
+          if (!currentList.some(x => x.id === item.id)) {
+            currentList.push(item);
           }
         });
-
-        // Двойной клик на ПК
-        card.addEventListener('dblclick', () => {
-          openContextMenu(order.id);
-        });
-
-        ordersContainer.appendChild(card);
-      });
-    }
-
-    function escapeHtml(text) {
-      return String(text).replace(/[&<>"']/g, (m) => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
-      })[m]);
-    }
-
-    // Сортировка Drag and Drop
-    new Sortable(ordersContainer, {
-      animation: 150,
-      onEnd: () => {
-        const updated = [];
-        document.querySelectorAll('.order-card').forEach(el => {
-          const id = el.dataset.id;
-          const found = appState.orders.find(o => o.id == id);
-          if (found) updated.push(found);
-        });
-        appState.orders = updated;
-        saveToFirebase();
-      }
-    });
-
-    // Pull-to-refresh (Свайп вниз для обновления)
-    let touchStartY = 0;
-    const pullRefreshEl = document.getElementById('pull-refresh');
-
-    window.addEventListener('touchstart', (e) => {
-      if (window.scrollY === 0) {
-        touchStartY = e.touches[0].clientY;
-      }
-    });
-
-    window.addEventListener('touchmove', (e) => {
-      const touchY = e.touches[0].clientY;
-      const diff = touchY - touchStartY;
-      if (diff > 0 && window.scrollY === 0) {
-        pullRefreshEl.style.top = Math.min(diff / 2.5 - 45, 15) + 'px';
-      }
-    });
-
-    window.addEventListener('touchend', () => {
-      if (parseInt(pullRefreshEl.style.top) >= 10) {
-        fetchFromFirebase();
-      }
-      pullRefreshEl.style.top = '-45px';
-    });
-
-    // Управление модальными окнами
-    function toggleModal(id, show) {
-      const modal = document.getElementById(id);
-      if (show) modal.classList.add('active');
-      else modal.classList.remove('active');
-    }
-
-    // Создание / Редактирование заказа
-    document.getElementById('addOrderBtn').onclick = () => {
-      editingOrderId = null;
-      document.getElementById('orderModalTitle').innerText = 'Новый заказ';
-      document.getElementById('orderAddress').value = '';
-      document.getElementById('orderDesc').value = '';
-      document.getElementById('orderCount').value = '1';
-      document.getElementById('orderPrice').value = '';
-      toggleModal('orderModal', true);
-    };
-
-    document.getElementById('cancelOrderBtn').onclick = () => toggleModal('orderModal', false);
-
-    document.getElementById('saveOrderBtn').onclick = () => {
-      const address = document.getElementById('orderAddress').value.trim();
-      const desc = document.getElementById('orderDesc').value.trim();
-      const count = parseInt(document.getElementById('orderCount').value) || 1;
-      const price = parseInt(document.getElementById('orderPrice').value) || 0;
-
-      if (!address) return;
-
-      if (editingOrderId) {
-        const idx = appState.orders.findIndex(o => o.id == editingOrderId);
-        if (idx !== -1) {
-          appState.orders[idx] = { ...appState.orders[idx], address, desc, count, price };
-        }
-      } else {
-        appState.orders.push({
-          id: Date.now(),
-          address,
-          desc,
-          count,
-          price
+      } else if (mode === 'merge_all') {
+        importedList.forEach(item => {
+          let newItem = {...item, id: 'ord_' + Date.now() + Math.random()};
+          currentList.push(newItem);
         });
       }
 
-      saveToFirebase();
+      orders[currentCourierId] = currentList;
+      saveAndSync();
       renderOrders();
-      toggleModal('orderModal', false);
-    };
-
-    // Контекстное меню
-    function openContextMenu(id) {
-      selectedOrderId = id;
-      toggleModal('contextModal', true);
+      alert('Заказы успешно обработаны!');
     }
 
-    document.getElementById('ctxCloseBtn').onclick = () => toggleModal('contextModal', false);
-
-    document.getElementById('ctxDeleteBtn').onclick = () => {
-      appState.orders = appState.orders.filter(o => o.id != selectedOrderId);
-      saveToFirebase();
-      renderOrders();
-      toggleModal('contextModal', false);
-    };
-
-    document.getElementById('ctxEditBtn').onclick = () => {
-      toggleModal('contextModal', false);
-      const order = appState.orders.find(o => o.id == selectedOrderId);
-      if (order) {
-        editingOrderId = order.id;
-        document.getElementById('orderModalTitle').innerText = 'Редактировать заказ';
-        document.getElementById('orderAddress').value = order.address || '';
-        document.getElementById('orderDesc').value = order.desc || '';
-        document.getElementById('orderCount').value = order.count || 1;
-        document.getElementById('orderPrice').value = order.price || 0;
-        toggleModal('orderModal', true);
+    function saveAndSync() {
+      localStorage.setItem('courier_orders', JSON.stringify(orders));
+      if (navigator.onLine) {
+        db.ref('courier_app/orders').set(orders);
       }
-    };
+    }
 
-    // QR-код
-    document.getElementById('qrBtn').onclick = () => {
-      const qrContainer = document.getElementById('qrcode-container');
-      qrContainer.innerHTML = '';
-      new QRCode(qrContainer, {
-        text: window.location.href,
-        width: 180,
-        height: 180
-      });
-      toggleModal('qrModal', true);
-    };
-    document.getElementById('closeQrBtn').onclick = () => toggleModal('qrModal', false);
-
-    // Настройки
-    document.getElementById('settingsBtn').onclick = () => toggleModal('settingsModal', true);
-    document.getElementById('closeSettingsBtn').onclick = () => {
-      appState.syncInterval = parseInt(document.getElementById('syncIntervalSelect').value);
-      appState.theme = document.getElementById('themeSelect').value;
-
-      localStorage.setItem('v_sync', appState.syncInterval);
-      localStorage.setItem('v_theme', appState.theme);
-
-      applyTheme();
-      setupAutoSync();
-      toggleModal('settingsModal', false);
-    };
-
-    // Выбор курьера
-    document.getElementById('courierBtn').onclick = () => toggleModal('courierModal', true);
-    document.getElementById('closeCourierBtn').onclick = () => {
-      const val = document.getElementById('courierSelect').value;
-      appState.courier = val;
-      localStorage.setItem('v_courier', val);
-      document.getElementById('currentCourierName').innerText = val;
-      fetchFromFirebase();
-      toggleModal('courierModal', false);
-    };
-
-    // Инициализация
-    fetchFromFirebase();
-    setupAutoSync();
+    function openModal(id) { document.getElementById(id).classList.add('show'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('show'); }
   </script>
 </body>
 </html>
